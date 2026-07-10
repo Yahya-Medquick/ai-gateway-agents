@@ -32,5 +32,5 @@ jobs:
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        # Pulls payload securely forwarded by n8n HTTP Request
-        python main.py "${{ github.event.client_payload.user_query }}"
+        # Pulls payload securely forwarded by n8n HTTP Request inside single quotes
+        python main.py '${{ github.event.client_payload.data_json }}'
