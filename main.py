@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import requests
 from crewai import Agent, Task, Crew, LLM
 
 # 1. Initialize Gemini Flash as the core reasoning engine
@@ -10,9 +12,13 @@ llm = LLM(
 
 # Parse incoming payload data from n8n forwarded by the GitHub Action
 try:
-    user_input_payload = sys.argv[1]
-except IndexError:
+    # GitHub will pass a compressed JSON string containing both query and phone number
+    input_data = json.loads(sys.argv[1])
+    user_input_payload = input_data.get("user_query", "")
+    user_phone = input_data.get("phone_number", "")
+except Exception:
     user_input_payload = "Please convert the text into clean exam notes."
+    user_phone = "default"
 
 # 2. Define your Role-Based Cloud Agents
 analyst_agent = Agent(
@@ -50,6 +56,21 @@ crew = Crew(
     tasks=[extract_task, format_task]
 )
 
-# Run the crew and output the result
+# Run the crew and capture output text string
 result = crew.kickoff()
-print(result)
+output_text = str(result)
+
+# 5. Send data back to the n8n Loop-Back Webhook
+payload = {
+    "status": "success",
+    "phone_number": user_phone,
+    "final_notes": output_text
+}
+
+n8n_webhook_url = "https://professionaltasker.app.n8n.cloud/webhook-test/receive-agent-output"
+
+try:
+    response = requests.post(n8n_webhook_url, json=payload, timeout=30)
+    print(f"Callback successful. Status Code: {response.status_code}")
+except Exception as e:
+    print(f"Failed to deliver callback to n8n: {e}")
